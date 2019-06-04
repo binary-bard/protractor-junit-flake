@@ -28,18 +28,19 @@ exports['default'] = function () {
   var testAttempt = parsedOptions.testAttempt || 1;
   var logger = new _logger2['default'](parsedOptions.color);
 
-  function rerunFailedTests() {
+  function rerunFailedTests(status, output) {
     var failedSpecNames = (0, _junitXml.processResults)(parsedOptions.resultsXmlPath);
 
-    logger.log('info', 'Re-running tests: test attempt ' + testAttempt + '\n');
-    if (failedSpecNames.length === 0) {
-      logger.log('info', '\nNo failed specs were found. Not re-running tests.\n\n');
-      return;
+    ++testAttempt;
+    logger.log('info', 'Failed specs = ' + failedSpecNames);
+    if (!failedSpecNames && failedSpecNames.length === 0) {
+      logger.log('info', '\nNo failed specs were found. Exiting test attempt ' + testAttempt + '.\n');
+      callback(status, output);
     } else {
-      logger.log('info', 'Re-running:', failedSpecNames.length, ' tests');
+      logger.log('info', '\nRe-running test attempt ' + testAttempt + ' with ' + failedSpecNames.length + ' tests\n');
+      var specRegex = failedSpecNames.join('|');
+      return startProtractor(specRegex, true);
     }
-    var specRegex = failedSpecNames.join('|');
-    startProtractor(specRegex, true);
   }
 
   function handleTestEnd(status) {
@@ -49,8 +50,8 @@ exports['default'] = function () {
     if (status === 0) {
       callback(status);
     } else {
-      if (++testAttempt <= parsedOptions.maxAttempts) {
-        rerunFailedTests();
+      if (testAttempt < parsedOptions.maxAttempts) {
+        return rerunFailedTests(status, output);
       }
       callback(status, output);
     }
@@ -94,7 +95,7 @@ exports['default'] = function () {
   }
 
   if (testAttempt > 1 && testAttempt <= parsedOptions.maxAttempts) {
-    rerunFailedTests();
+    rerunFailedTests(0, '');
   } else {
     startProtractor();
   }
